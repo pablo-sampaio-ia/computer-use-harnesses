@@ -1,0 +1,26 @@
+[project]
+name = "computer-use-harnesses"
+version = "0.1.0"
+description = "Trilha didatica de harnesses de computer use"
+readme = "README.md"
+# 3.13 e o ponto seguro: pywinauto/torch/onnx podem nao ter rodas para 3.14.
+requires-python = ">=3.12"
+dependencies = [
+    "pillow>=10",
+    "openai>=1.60",
+    "google-genai>=2.7",
+    "anthropic>=0.60",
+    "pydantic>=2",
+]
+
+[project.optional-dependencies]
+local = ["pyautogui", "mss"]            # warm-up e P1 fora do container (so em VM!)
+browser = ["playwright"]                # P2, P3
+windows = ["pywinauto"] # P4 (somente Windows)
+vision = ["rapidocr-onnxruntime", "numpy"]  # P5: OCR leve (OmniParser/UI-TARS: ver README do P5)
+robust = ["scikit-image", "imagehash"]  # P7
+mcp = ["mcp", "pyyaml", "keyring"]  # P9
+pool = ["docker", "fastapi", "uvicorn"] # P10
+
+[tool.setuptools]
+packages = ["common"]

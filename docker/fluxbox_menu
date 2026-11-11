@@ -1,0 +1,5 @@
+[begin] (Menu)
+  [exec] (Chromium) {chromium}
+  [exec] (Mousepad - editor de texto) {mousepad}
+  [exec] (Terminal) {xterm}
+[end]

@@ -1,0 +1,7 @@
+# Politica como CODIGO, separada do agente. Quem decide o que e permitido nao e o modelo.
+allowed_hosts: [localhost, 127.0.0.1]   # allowlist de dominios (navegacao E requisicoes de rede do navegador)
+max_actions: 40                         # limite de acoes por sessao
+max_seconds: 600                        # limite de tempo por sessao
+send_patterns: ["Salvar", "Enviar", "Confirmar", "Entrar"]   # clique com estes nomes = ACAO DE ENVIO -> aprovacao humana
+deny_patterns: ["Excluir", "Apagar", "Deletar"]              # clique com estes nomes = NEGADO sempre
+approval: ask                           # ask (pagina local) | auto_approve | auto_deny
