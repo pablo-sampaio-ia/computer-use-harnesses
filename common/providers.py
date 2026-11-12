@@ -72,11 +72,13 @@ def px_to_clicks(px, per_click=100):
 class OpenAIProvider:
     """Responses API + ferramenta {"type": "computer"}. Acoes vem em lote (`actions`)."""
 
-    def __init__(self, model=None):
+    def __init__(self, model=None, system=None):
         from openai import OpenAI
         self.client = OpenAI()
         self.model = model or os.getenv("OPENAI_CU_MODEL", "gpt-6.1-sol")
         self.tools = [{"type": "computer"}]
+        # `instructions` NAO e herdado via previous_response_id: precisa ir em TODA chamada.
+        self.sys = {"instructions": system} if system else {}
         self.prev_id = None
         self.call_id = None
         self.pending_checks = []
@@ -118,8 +120,11 @@ class OpenAIProvider:
         return Action("screenshot", **base)
 
     def start(self, goal, png):
-        # Docs: a primeira resposta costuma pedir apenas um `screenshot`.
-        return self._parse(self.client.responses.create(model=self.model, tools=self.tools, input=goal))
+        # `png` NAO e usado de proposito. Na ferramenta `computer` da OpenAI, a tela chega como RESULTADO de uma chamada
+        # (computer_call_output), e o modelo sempre comeca pedindo um `screenshot`. Testado: mandar o PNG junto com o
+        # objetivo nao eliminou esse passo e ainda custou ~2,7 mil tokens a mais (8,2k contra 5,4k). Gemini e Anthropic
+        # aceitam a imagem no 1o turno, entao la ela vai.
+        return self._parse(self.client.responses.create(model=self.model, tools=self.tools, input=goal, **self.sys))
 
     def reply(self, results, png):
         item = {
@@ -131,16 +136,18 @@ class OpenAIProvider:
         if self.pending_checks:
             item["acknowledged_safety_checks"] = self.pending_checks
         return self._parse(self.client.responses.create(
-            model=self.model, tools=self.tools, previous_response_id=self.prev_id, input=[item]))
+            model=self.model, tools=self.tools, previous_response_id=self.prev_id, input=[item], **self.sys))
 
 
 # --------------------------------------------------------------------------- Gemini
 class GeminiProvider:
     """Interactions API + ferramenta computer_use. Coordenadas normalizadas 0-999."""
 
-    def __init__(self, model=None, image_size=(1280, 800), environment="desktop"):
+    def __init__(self, model=None, image_size=(1280, 800), environment="desktop", system=None):
         from google import genai
         self.client = genai.Client()
+        # A doc nao diz se `system_instruction` e herdado via previous_interaction_id: reenviamos sempre.
+        self.sys = {"system_instruction": system} if system else {}
         self.model = model or os.getenv("GEMINI_CU_MODEL", "gemini-3.8-flash")
         self.tools = [{"type": "computer_use", "environment": environment}]
         self.w, self.h = image_size
@@ -200,7 +207,7 @@ class GeminiProvider:
         it = self.client.interactions.create(
             model=self.model, tools=self.tools,
             input=[{"type": "text", "text": goal},
-                   {"type": "image", "data": b64(png), "mime_type": "image/png"}])
+                   {"type": "image", "data": b64(png), "mime_type": "image/png"}], **self.sys)
         return self._parse(it)
 
     def reply(self, results, png):
@@ -215,7 +222,7 @@ class GeminiProvider:
                            {"type": "image", "data": b64(png), "mime_type": "image/png"}],
             })
         it = self.client.interactions.create(
-            model=self.model, tools=self.tools, previous_interaction_id=self.prev_id, input=items)
+            model=self.model, tools=self.tools, previous_interaction_id=self.prev_id, input=items, **self.sys)
         return self._parse(it)
 
 
@@ -225,16 +232,17 @@ class AnthropicProvider:
 
     NOT_RUN = "Not executed: an earlier computer action in this turn failed."
 
-    def __init__(self, model=None):
+    def __init__(self, model=None, system=None):
         import anthropic
         self.client = anthropic.Anthropic()
         self.model = model or os.getenv("ANTHROPIC_CU_MODEL", "claude-sonnet-5-5")
         self.tools = [{"type": "computer_toolset_20260801"}]
+        self.sys = {"system": system} if system else {}      # aqui a API e sem estado: reenviamos sempre mesmo
         self.messages = []
 
     def _call(self):
         resp = self.client.messages.create(model=self.model, max_tokens=4096,
-                                           tools=self.tools, messages=self.messages)
+                                           tools=self.tools, messages=self.messages, **self.sys)
         self.messages.append({"role": "assistant", "content": [b.model_dump(exclude_none=True) for b in resp.content]})
         turn = Turn(tokens_in=resp.usage.input_tokens, tokens_out=resp.usage.output_tokens)
         for b in resp.content:
@@ -291,11 +299,12 @@ class AnthropicProvider:
         return self._call()
 
 
-def make_provider(name, image_size, model=None):
+def make_provider(name, image_size, model=None, system=None):
+    """`image_size` so importa ao Gemini (coordenadas 0-999 -> pixels). `system`: instrucoes de sistema (opcional)."""
     if name == "openai":
-        return OpenAIProvider(model)
+        return OpenAIProvider(model, system)
     if name == "gemini":
-        return GeminiProvider(model, image_size)
+        return GeminiProvider(model, image_size, system=system)
     if name == "anthropic":
-        return AnthropicProvider(model)
+        return AnthropicProvider(model, system)
     raise ValueError(f"provedor desconhecido: {name}")

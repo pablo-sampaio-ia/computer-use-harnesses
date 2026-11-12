@@ -9,6 +9,7 @@ from pathlib import Path
 
 from common.images import Scaler
 from common.providers import Result, make_provider
+from prompts import load_env_prompt
 
 NOT_RUN = "Not executed: an earlier computer action in this turn failed."
 
@@ -43,13 +44,16 @@ def ask_human(message):
 
 
 def run_agent(computer, goal, provider="openai", model=None, max_steps=25, max_width=1280,
-              approve=ask_human, run_dir=None, verbose=True):
+              approve=ask_human, run_dir=None, verbose=True, system_prompt=None):
     """Roda o agente ate o modelo parar de pedir acoes ou estourar `max_steps`.
 
+    `system_prompt`: texto de instrucoes de sistema (opcional). Se None, usa o arquivo apontado pela variavel
+    CU_SYSTEM_PROMPT_FILE, se existir; senao NAO ha system prompt (so o objetivo). Veja a pasta prompts/.
     Devolve dict com: done, steps, text, tokens_in, tokens_out, run_dir.
     """
+    system_prompt = system_prompt or load_env_prompt()
     scaler = Scaler(computer.width, computer.height, max_width)
-    prov = make_provider(provider, (scaler.model_w, scaler.model_h), model)
+    prov = make_provider(provider, (scaler.model_w, scaler.model_h), model, system_prompt)
     run_dir = Path(run_dir or f"runs/{time.strftime('%Y%m%d-%H%M%S')}-{provider}")
     run_dir.mkdir(parents=True, exist_ok=True)
     trace = open(run_dir / "trace.jsonl", "w", encoding="utf-8")

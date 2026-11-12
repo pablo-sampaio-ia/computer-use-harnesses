@@ -23,4 +23,4 @@ mcp = ["mcp", "pyyaml", "keyring"]  # P9
 pool = ["docker", "fastapi", "uvicorn"] # P10
 
 [tool.setuptools]
-packages = ["common"]
+packages = ["common", "prompts"]

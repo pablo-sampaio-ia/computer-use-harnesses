@@ -30,3 +30,20 @@ Telas menores são mais baratas, mas elementos pequenos ficam ilegíveis.
 ## Status
 Escrito e verificado com tela simulada (sem Docker nesta máquina). Rodar no container e com a Anthropic
 (sem chave aqui) ainda **não foi testado**.
+
+## System prompt (opcional)
+Por padrão **não há** system prompt: o modelo recebe só o objetivo, e a ferramenta de computer use define suas capacidades.
+Para testar instruções de sistema, os prompts ficam em `prompts/` (fora do código) e valem para os 3 provedores
+(`instructions` na OpenAI, `system` na Anthropic, `system_instruction` no Gemini; reenviados em toda chamada):
+```bash
+uv run python -m p01_loop_nativo.web_test openai --system computer_use_default     # ou --system-file meu.md
+CU_SYSTEM_PROMPT_FILE=prompts/computer_use_default.md uv run python -m bench.run ...   # vale também p/ bench/pool
+```
+**Efeito medido (OpenAI, cadastrar 1 cliente):** sem prompt, 2 passos e ~5,4 mil tokens; com o prompt de exemplo ("confira
+o resultado de cada ação"), 6 passos e ~34 mil tokens, pois o modelo passou a agir uma ação por vez, conferindo cada uma.
+Mesmo resultado final, 6× o custo: instruções de sistema mudam muito o comportamento, então meça antes de adotar.
+
+## Por que o `start` da OpenAI não envia o PNG
+Na ferramenta `computer` da OpenAI a tela chega como *resultado* de uma chamada e o modelo sempre começa pedindo um
+`screenshot`. Testado: enviar o PNG junto com o objetivo não eliminou esse passo e custou ~2,7 mil tokens a mais.
+Anthropic e Gemini aceitam a imagem já no primeiro turno, e lá ela é enviada.
